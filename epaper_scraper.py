@@ -10,19 +10,63 @@ def fetch_links():
     soup = BeautifulSoup(response.text, 'html.parser')
     data = []
 
-    for p in soup.find_all('p', class_='has-text-align-center'):
-        try:
-            date_text = p.find('b').contents[0].strip().replace(":", "")
-            ap_link = p.find_all('a')[0]['href']
-            ts_link = p.find_all('a')[1]['href']
+    blocks = soup.find_all('p')
 
-            data.append({
-                "date": date_text,
-                "ap_link": ap_link,
-                "ts_link": ts_link
-            })
-        except Exception as e:
-            continue  # Skip if structure is not as expected
+    for block in blocks:
+        try:
+            links = block.find_all('a', href=True)
+
+            if len(links) < 2:
+                continue
+
+            ap_link = None
+            ts_link = None
+            date_text_raw = None
+
+            for link in links:
+                text = link.text.strip().lower()
+                href = link['href']
+
+                # Extract AP & TS links
+                if "ap edition" in text:
+                    ap_link = href
+                    date_text_raw = text
+                elif "ts edition" in text:
+                    ts_link = href
+
+            # Extract date from text like: "download 26 mar 26 ap edition"
+            if date_text_raw:
+                parts = date_text_raw.split()
+
+                # Expected: ['download', '26', 'mar', '26', 'ap', 'edition']
+                day = parts[1]
+                month = parts[2]
+                year = parts[3]
+
+                # Convert month text → number
+                month_map = {
+                    "jan": "01", "feb": "02", "mar": "03",
+                    "apr": "04", "may": "05", "jun": "06",
+                    "jul": "07", "aug": "08", "sep": "09",
+                    "oct": "10", "nov": "11", "dec": "12"
+                }
+
+                month_num = month_map.get(month.lower(), "01")
+
+                # Convert year (26 → 2026)
+                full_year = "20" + year
+
+                formatted_date = f"{day.zfill(2)}-{month_num}-{full_year}"
+
+                if ap_link and ts_link:
+                    data.append({
+                        "date": formatted_date,
+                        "ap_link": ap_link,
+                        "ts_link": ts_link
+                    })
+
+        except Exception:
+            continue
 
     return data
 
